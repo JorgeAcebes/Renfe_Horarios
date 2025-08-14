@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Renfe Coslada - Vicálvaro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: white;
+            color: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+        }
+        
+        .container {
+            text-align: center;
+            border: 2px solid black;
+            padding: 40px;
+            background-color: white;
+        }
+        
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        
+        .time-info {
+            background-color: transparent;
+            color: black;
+            padding: 10px;
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 12px;
+            text-align: center;
+        }
+        
+        button {
+            background-color: black;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            letter-spacing: 1px;
+            transition: all 0.2s;
+            margin: 5px;
+            min-width: 250px;
+        }
+        
+        button:hover {
+            background-color: white;
+            color: black;
+            border: 2px solid black;
+        }
+        
+        button:active {
+            transform: scale(0.98);
+        }
+        
+        .buttons-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .edit-btn {
+            background-color: white;
+            color: black;
+            border: 1px solid black;
+            padding: 8px 16px;
+            font-size: 12px;
+            margin-top: 15px;
+        }
+        
+        .edit-btn:hover {
+            background-color: black;
+            color: white;
+        }
+        
+        .edit-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            z-index: 1000;
+        }
+        
+        .edit-modal.show {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background-color: white;
+            border: 2px solid black;
+            padding: 20px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-sizing: border-box;
+        }
+        
+        .modal-header {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .route-item {
+            display: flex;
+            align-items: stretch;
+            margin-bottom: 15px;
+            padding: 8px;
+            border: 1px solid black;
+            gap: 8px;
+        }
+        
+        .route-name {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            font-family: Arial;
+            font-size: 14px;
+            min-width: 200px;
+            width: 100%;
+        }
+        
+        .delete-route-btn {
+            background-color: black;
+            color: white;
+            border: none;
+            padding: 6px 8px;
+            font-size: 16px;
+            cursor: pointer;
+            white-space: nowrap;
+            flex-shrink: 0;
+            width: auto;
+            min-width: auto;
+        }
+        
+        .delete-route-btn:hover {
+            background-color: #333;
+        }
+        
+        .add-route-section {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid black;
+        }
+        
+        .add-route-section h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .add-route-section p {
+            font-size: 12px;
+            margin-bottom: 15px;
+            color: #666;
+        }
+        
+        .new-route-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid black;
+            margin-bottom: 10px;
+            font-family: Arial;
+            box-sizing: border-box;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            flex-direction: column;
+            margin-top: 20px;
+            gap: 10px;
+        }
+        
+        .save-btn, .cancel-btn, .add-route-btn {
+            padding: 12px 15px;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+            width: 100%;
+        }
+        
+        .save-btn {
+            background-color: black;
+            color: white;
+        }
+        
+        .cancel-btn {
+            background-color: white;
+            color: black;
+            border: 1px solid black;
+        }
+        
+        .add-route-btn {
+            background-color: black;
+            color: white;
+        }
+        
+        .auto-redirect {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #666;
+            display: none;
+        }
+        
+        .countdown {
+            font-weight: bold;
+            color: black;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>RENFE CERCANÍAS MADRID</h1>
+        
+        <div class="buttons-container" id="buttonsContainer">
+            <button class="route-btn" data-route="coslada-vicalvaro">COSLADA → VICÁLVARO</button>
+            <button class="route-btn" data-route="vicalvaro-coslada">VICÁLVARO → COSLADA</button>
+            <button class="route-btn" data-route="universidad-coslada">UNIVERSIDAD → COSLADA</button>
+        </div>
+        
+        <button class="edit-btn" id="editBtn">✏️ EDITAR TRAYECTOS</button>
+    </div>
+    
+    <div class="time-info">
+        <div id="current-date"></div>
+        <div id="current-time"></div>
+    </div>
+    
+    <!-- Modal de edición -->
+    <div class="edit-modal" id="editModal">
+        <div class="modal-content">
+            <div class="modal-header">EDITAR TRAYECTOS</div>
+            
+            <div id="routesList"></div>
+            
+            <div class="add-route-section">
+                <h3>AÑADIR NUEVO TRAYECTO</h3>
+                <p>Pega aquí el enlace completo de Renfe con el trayecto deseado:</p>
+                <input type="text" class="new-route-input" id="newRouteName" placeholder="Nombre del trayecto (ej: MADRID → BARCELONA)" />
+                <input type="text" class="new-route-input" id="newRouteUrl" placeholder="https://www.renfe.com/es/es/cercanias/..." />
+                <button class="add-route-btn" id="addRouteBtn">AÑADIR TRAYECTO</button>
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="save-btn" id="saveBtn">GUARDAR CAMBIOS</button>
+                <button class="cancel-btn" id="cancelBtn">CANCELAR</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Estado de rutas
+        let routes = {
+            'coslada-vicalvaro': {
+                name: 'COSLADA → VICÁLVARO',
+                originValue: '100070108',
+                originText: 'Coslada',
+                destinationValue: '100070100',
+                destinationText: 'Vic%C3%A1lvaro'
+            },
+            'vicalvaro-coslada': {
+                name: 'VICÁLVARO → COSLADA',
+                originValue: '100070100',
+                originText: 'Vic%C3%A1lvaro',
+                destinationValue: '100070108',
+                destinationText: 'Coslada'
+            },
+            'universidad-coslada': {
+                name: 'UNIVERSIDAD → COSLADA',
+                originValue: '100017009',
+                originText: 'Universidad+Cantoblanco',
+                destinationValue: '100070108',
+                destinationText: 'Coslada'
+            }
+        };
+
+        function getRouteURL(routeId) {
+            const now = new Date();
+            
+            // Formato de fecha para la URL (DD-MM-YYYY)
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+            const dateForURL = `${day}-${month}-${year}`;
+            
+            // Formato de hora para la URL (HH:MM)
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const timeForURL = `${hours}%3A${minutes}`;
+            
+            const route = routes[routeId];
+            if (!route) return '';
+            
+            const baseURL = 'https://www.renfe.com/es/es/cercanias/cercanias-madrid/horarios#/listado?tripType=station';
+            
+            return `${baseURL}&originInputValue=${route.originValue}&originInputText=${route.originText}&destinationInputValue=${route.destinationValue}&destinationInputText=${route.destinationText}&tripPreferences=todas&whenToDepartType=1&deptDate=${dateForURL}&deptTime=${timeForURL}`;
+        }
+        
+        function extractRouteFromUrl(url) {
+            try {
+                const urlObj = new URL(url);
+                const hash = urlObj.hash;
+                const params = new URLSearchParams(hash.split('?')[1] || '');
+                
+                return {
+                    originValue: params.get('originInputValue') || '',
+                    originText: params.get('originInputText') || '',
+                    destinationValue: params.get('destinationInputValue') || '',
+                    destinationText: params.get('destinationInputText') || ''
+                };
+            } catch (e) {
+                return null;
+            }
+        }
+        
+        function renderButtons() {
+            const container = document.getElementById('buttonsContainer');
+            container.innerHTML = '';
+            
+            Object.keys(routes).forEach(routeId => {
+                const button = document.createElement('button');
+                button.className = 'route-btn';
+                button.setAttribute('data-route', routeId);
+                button.textContent = routes[routeId].name;
+                container.appendChild(button);
+                
+                button.addEventListener('click', function() {
+                    redirectToRenfe(routeId);
+                });
+            });
+        }
+        
+        function renderEditModal() {
+            const routesList = document.getElementById('routesList');
+            routesList.innerHTML = '';
+            
+            Object.keys(routes).forEach(routeId => {
+                const routeItem = document.createElement('div');
+                routeItem.className = 'route-item';
+                routeItem.innerHTML = `
+                    <input type="text" class="route-name" value="${routes[routeId].name}" data-route="${routeId}" />
+                    <button class="delete-route-btn" data-route="${routeId}">🗑️</button>
+                `;
+                routesList.appendChild(routeItem);
+            });
+            
+            // Event listeners para eliminar rutas
+            document.querySelectorAll('.delete-route-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const routeId = this.getAttribute('data-route');
+                    delete routes[routeId];
+                    renderEditModal();
+                });
+            });
+        }
+        
+        function updateDateTime() {
+            const now = new Date();
+            
+            // Formato de fecha para la URL (DD-MM-YYYY)
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+            
+            // Formato de hora para la URL (HH:MM)
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            
+            // Mostrar fecha y hora en la página
+            document.getElementById('current-date').textContent = `FECHA: ${day}/${month}/${year}`;
+            document.getElementById('current-time').textContent = `HORA: ${hours}:${minutes}`;
+        }
+        
+        function redirectToRenfe(route = 'coslada-vicalvaro') {
+            const url = getRouteURL(route);
+            if (url) {
+                window.open(url, '_blank');
+            }
+        }
+        
+        // Actualizar fecha y hora cada segundo
+        setInterval(updateDateTime, 1000);
+        updateDateTime();
+        
+        // Renderizar botones inicialmente
+        renderButtons();
+        
+        // Event listeners para el modal
+        document.getElementById('editBtn').addEventListener('click', function() {
+            renderEditModal();
+            document.getElementById('editModal').classList.add('show');
+        });
+        
+        document.getElementById('cancelBtn').addEventListener('click', function() {
+            document.getElementById('editModal').classList.remove('show');
+        });
+        
+        document.getElementById('saveBtn').addEventListener('click', function() {
+            // Actualizar nombres de rutas
+            document.querySelectorAll('.route-name').forEach(input => {
+                const routeId = input.getAttribute('data-route');
+                if (routes[routeId]) {
+                    routes[routeId].name = input.value;
+                }
+            });
+            
+            renderButtons();
+            document.getElementById('editModal').classList.remove('show');
+        });
+        
+        document.getElementById('addRouteBtn').addEventListener('click', function() {
+            const name = document.getElementById('newRouteName').value.trim();
+            const url = document.getElementById('newRouteUrl').value.trim();
+            
+            if (!name || !url) {
+                alert('Por favor, introduce tanto el nombre como la URL del trayecto.');
+                return;
+            }
+            
+            const routeData = extractRouteFromUrl(url);
+            if (!routeData || !routeData.originValue || !routeData.destinationValue) {
+                alert('URL no válida. Asegúrate de que sea un enlace de Renfe con origen y destino.');
+                return;
+            }
+            
+            const routeId = 'route_' + Date.now();
+            routes[routeId] = {
+                name: name,
+                originValue: routeData.originValue,
+                originText: routeData.originText,
+                destinationValue: routeData.destinationValue,
+                destinationText: routeData.destinationText
+            };
+            
+            document.getElementById('newRouteName').value = '';
+            document.getElementById('newRouteUrl').value = '';
+            
+            renderEditModal();
+            alert('Trayecto añadido correctamente.');
+        });
+        
+        // Cerrar modal al hacer clic fuera
+        document.getElementById('editModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.classList.remove('show');
+            }
+        });
+    </script>
+</body>
+</html>
