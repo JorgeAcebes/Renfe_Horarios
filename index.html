@@ -196,7 +196,7 @@
             gap: 10px;
         }
         
-        .save-btn, .cancel-btn, .add-route-btn {
+        .save-btn, .cancel-btn, .add-route-btn, .reset-btn {
             padding: 12px 15px;
             border: none;
             font-weight: bold;
@@ -221,6 +221,16 @@
             color: white;
         }
         
+        .reset-btn {
+            background-color: #dc3545;
+            color: white;
+            margin-top: 10px;
+        }
+        
+        .reset-btn:hover {
+            background-color: #c82333;
+        }
+        
         .auto-redirect {
             margin-top: 20px;
             font-size: 12px;
@@ -232,6 +242,15 @@
             font-weight: bold;
             color: black;
         }
+        
+        .storage-info {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+            font-size: 11px;
+            color: #888;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -239,12 +258,14 @@
         <h1>RENFE CERCANÍAS MADRID</h1>
         
         <div class="buttons-container" id="buttonsContainer">
-            <button class="route-btn" data-route="coslada-vicalvaro">COSLADA → VICÁLVARO</button>
-            <button class="route-btn" data-route="vicalvaro-coslada">VICÁLVARO → COSLADA</button>
-            <button class="route-btn" data-route="universidad-coslada">UNIVERSIDAD → COSLADA</button>
+            <!-- Los botones se generarán dinámicamente -->
         </div>
         
         <button class="edit-btn" id="editBtn">✏️ EDITAR TRAYECTOS</button>
+        
+        <div class="storage-info">
+            Los trayectos se guardan localmente en tu navegador
+        </div>
     </div>
     
     <div class="time-info">
@@ -270,13 +291,14 @@
             <div class="modal-buttons">
                 <button class="save-btn" id="saveBtn">GUARDAR CAMBIOS</button>
                 <button class="cancel-btn" id="cancelBtn">CANCELAR</button>
+                <button class="reset-btn" id="resetBtn">RESTABLECER VALORES POR DEFECTO</button>
             </div>
         </div>
     </div>
 
     <script>
-        // Estado de rutas
-        let routes = {
+        // Configuración por defecto
+        const DEFAULT_ROUTES = {
             'coslada-vicalvaro': {
                 name: 'COSLADA → VICÁLVARO',
                 originValue: '100070108',
@@ -299,6 +321,49 @@
                 destinationText: 'Coslada'
             }
         };
+
+        // Estado de rutas (se carga desde localStorage)
+        let routes = {};
+
+        // Funciones de almacenamiento local
+        function saveRoutesToStorage() {
+            try {
+                localStorage.setItem('renfe_routes', JSON.stringify(routes));
+                console.log('Rutas guardadas en localStorage');
+            } catch (error) {
+                console.error('Error al guardar en localStorage:', error);
+                alert('Error al guardar los cambios. Puede que tu navegador tenga el almacenamiento local deshabilitado.');
+            }
+        }
+
+        function loadRoutesFromStorage() {
+            try {
+                const savedRoutes = localStorage.getItem('renfe_routes');
+                if (savedRoutes) {
+                    routes = JSON.parse(savedRoutes);
+                    console.log('Rutas cargadas desde localStorage');
+                } else {
+                    // Si no hay rutas guardadas, usar las por defecto
+                    routes = { ...DEFAULT_ROUTES };
+                    saveRoutesToStorage();
+                    console.log('Usando rutas por defecto y guardándolas');
+                }
+            } catch (error) {
+                console.error('Error al cargar desde localStorage:', error);
+                routes = { ...DEFAULT_ROUTES };
+                console.log('Error de localStorage, usando rutas por defecto');
+            }
+        }
+
+        function resetToDefaultRoutes() {
+            if (confirm('¿Estás seguro de que quieres restablecer todos los trayectos a los valores por defecto? Se perderán todos tus cambios personalizados.')) {
+                routes = { ...DEFAULT_ROUTES };
+                saveRoutesToStorage();
+                renderButtons();
+                renderEditModal();
+                alert('Trayectos restablecidos a los valores por defecto.');
+            }
+        }
 
         function getRouteURL(routeId) {
             const now = new Date();
@@ -374,8 +439,10 @@
             document.querySelectorAll('.delete-route-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const routeId = this.getAttribute('data-route');
-                    delete routes[routeId];
-                    renderEditModal();
+                    if (confirm('¿Estás seguro de que quieres eliminar este trayecto?')) {
+                        delete routes[routeId];
+                        renderEditModal();
+                    }
                 });
             });
         }
@@ -404,12 +471,18 @@
             }
         }
         
+        // Inicialización de la aplicación
+        function initApp() {
+            loadRoutesFromStorage();
+            renderButtons();
+            updateDateTime();
+        }
+        
         // Actualizar fecha y hora cada segundo
         setInterval(updateDateTime, 1000);
-        updateDateTime();
         
-        // Renderizar botones inicialmente
-        renderButtons();
+        // Inicializar la app al cargar
+        initApp();
         
         // Event listeners para el modal
         document.getElementById('editBtn').addEventListener('click', function() {
@@ -419,6 +492,9 @@
         
         document.getElementById('cancelBtn').addEventListener('click', function() {
             document.getElementById('editModal').classList.remove('show');
+            // Recargar rutas desde localStorage para descartar cambios
+            loadRoutesFromStorage();
+            renderButtons();
         });
         
         document.getElementById('saveBtn').addEventListener('click', function() {
@@ -426,12 +502,23 @@
             document.querySelectorAll('.route-name').forEach(input => {
                 const routeId = input.getAttribute('data-route');
                 if (routes[routeId]) {
-                    routes[routeId].name = input.value;
+                    routes[routeId].name = input.value.trim() || routes[routeId].name;
                 }
             });
             
+            // Guardar en localStorage
+            saveRoutesToStorage();
             renderButtons();
             document.getElementById('editModal').classList.remove('show');
+            
+            // Mostrar confirmación
+            const originalText = document.getElementById('saveBtn').textContent;
+            document.getElementById('saveBtn').textContent = '✓ GUARDADO';
+            setTimeout(() => {
+                if (document.getElementById('saveBtn')) {
+                    document.getElementById('saveBtn').textContent = originalText;
+                }
+            }, 2000);
         });
         
         document.getElementById('addRouteBtn').addEventListener('click', function() {
@@ -462,13 +549,31 @@
             document.getElementById('newRouteUrl').value = '';
             
             renderEditModal();
-            alert('Trayecto añadido correctamente.');
+            alert('Trayecto añadido correctamente. No olvides hacer clic en "GUARDAR CAMBIOS" para que se mantenga permanentemente.');
         });
+        
+        // Botón de reset
+        document.getElementById('resetBtn').addEventListener('click', resetToDefaultRoutes);
         
         // Cerrar modal al hacer clic fuera
         document.getElementById('editModal').addEventListener('click', function(e) {
             if (e.target === this) {
                 this.classList.remove('show');
+                // Recargar rutas desde localStorage para descartar cambios
+                loadRoutesFromStorage();
+                renderButtons();
+            }
+        });
+
+        // Prevenir pérdida de datos al cerrar la página
+        window.addEventListener('beforeunload', function(e) {
+            // Solo mostrar advertencia si hay cambios sin guardar
+            const currentRoutes = JSON.stringify(routes);
+            const savedRoutes = localStorage.getItem('renfe_routes') || JSON.stringify(DEFAULT_ROUTES);
+            
+            if (currentRoutes !== savedRoutes) {
+                e.preventDefault();
+                e.returnValue = '';
             }
         });
     </script>
