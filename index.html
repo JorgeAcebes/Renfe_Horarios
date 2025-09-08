@@ -113,7 +113,7 @@
             background-color: white;
             border: 2px solid black;
             padding: 20px;
-            max-width: 500px;
+            max-width: 600px;
             width: 90%;
             max-height: 80vh;
             overflow-y: auto;
@@ -134,6 +134,32 @@
             padding: 8px;
             border: 1px solid black;
             gap: 8px;
+            cursor: move;
+            user-select: none;
+        }
+        
+        .route-item.dragging {
+            opacity: 0.5;
+        }
+        
+        .route-item.drag-over {
+            border-color: #007bff;
+            background-color: #f0f8ff;
+        }
+        
+        .route-item.hidden-route {
+            background-color: #f5f5f5;
+            opacity: 0.7;
+        }
+        
+        .drag-handle {
+            display: flex;
+            align-items: center;
+            padding: 0 8px;
+            cursor: move;
+            font-size: 14px;
+            color: #666;
+            flex-shrink: 0;
         }
         
         .route-name {
@@ -142,25 +168,54 @@
             border: 1px solid #ccc;
             font-family: Arial;
             font-size: 14px;
-            min-width: 200px;
-            width: 100%;
+            min-width: 150px;
         }
         
-        .delete-route-btn {
+        .route-controls {
+            display: flex;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        
+        .control-btn {
             background-color: black;
             color: white;
             border: none;
             padding: 6px 8px;
-            font-size: 16px;
+            font-size: 14px;
             cursor: pointer;
             white-space: nowrap;
-            flex-shrink: 0;
             width: auto;
             min-width: auto;
+            transition: background-color 0.2s;
         }
         
-        .delete-route-btn:hover {
+        .control-btn:hover {
             background-color: #333;
+        }
+        
+        .visibility-btn {
+            background-color: #007bff;
+        }
+        
+        .visibility-btn:hover {
+            background-color: #0056b3;
+        }
+        
+        .visibility-btn.hidden {
+            background-color: #6c757d;
+        }
+        
+        .visibility-btn.hidden:hover {
+            background-color: #545b62;
+        }
+        
+        .delete-btn {
+            background-color: #dc3545;
+        }
+        
+        .delete-btn:hover {
+            background-color: #c82333;
         }
         
         .add-route-section {
@@ -251,6 +306,16 @@
             color: #888;
             text-align: center;
         }
+        
+        .section-info {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 12px;
+            color: #666;
+            text-align: left;
+        }
     </style>
 </head>
 <body>
@@ -304,26 +369,33 @@
                 originValue: '100070108',
                 originText: 'Coslada',
                 destinationValue: '100070100',
-                destinationText: 'Vic%C3%A1lvaro'
+                destinationText: 'Vic%C3%A1lvaro',
+                visible: true,
+                order: 0
             },
             'vicalvaro-coslada': {
                 name: 'VICÁLVARO → COSLADA',
                 originValue: '100070100',
                 originText: 'Vic%C3%A1lvaro',
                 destinationValue: '100070108',
-                destinationText: 'Coslada'
+                destinationText: 'Coslada',
+                visible: true,
+                order: 1
             },
             'universidad-coslada': {
                 name: 'UNIVERSIDAD → COSLADA',
                 originValue: '100017009',
                 originText: 'Universidad+Cantoblanco',
                 destinationValue: '100070108',
-                destinationText: 'Coslada'
+                destinationText: 'Coslada',
+                visible: true,
+                order: 2
             }
         };
 
         // Estado de rutas (se carga desde localStorage)
         let routes = {};
+        let draggedElement = null;
 
         // Funciones de almacenamiento local
         function saveRoutesToStorage() {
@@ -341,6 +413,24 @@
                 const savedRoutes = localStorage.getItem('renfe_routes');
                 if (savedRoutes) {
                     routes = JSON.parse(savedRoutes);
+                    
+                    // Migrar rutas antiguas que no tengan las nuevas propiedades
+                    let needsUpdate = false;
+                    Object.keys(routes).forEach((routeId, index) => {
+                        if (routes[routeId].visible === undefined) {
+                            routes[routeId].visible = true;
+                            needsUpdate = true;
+                        }
+                        if (routes[routeId].order === undefined) {
+                            routes[routeId].order = index;
+                            needsUpdate = true;
+                        }
+                    });
+                    
+                    if (needsUpdate) {
+                        saveRoutesToStorage();
+                    }
+                    
                     console.log('Rutas cargadas desde localStorage');
                 } else {
                     // Si no hay rutas guardadas, usar las por defecto
@@ -404,11 +494,26 @@
             }
         }
         
+        function getSortedRoutes() {
+            return Object.keys(routes)
+                .sort((a, b) => {
+                    const orderA = routes[a].order !== undefined ? routes[a].order : 999;
+                    const orderB = routes[b].order !== undefined ? routes[b].order : 999;
+                    return orderA - orderB;
+                });
+        }
+        
+        function getVisibleRoutes() {
+            return getSortedRoutes().filter(routeId => routes[routeId].visible !== false);
+        }
+        
         function renderButtons() {
             const container = document.getElementById('buttonsContainer');
             container.innerHTML = '';
             
-            Object.keys(routes).forEach(routeId => {
+            const visibleRoutes = getVisibleRoutes();
+            
+            visibleRoutes.forEach(routeId => {
                 const button = document.createElement('button');
                 button.className = 'route-btn';
                 button.setAttribute('data-route', routeId);
@@ -421,22 +526,65 @@
             });
         }
         
+        function toggleRouteVisibility(routeId) {
+            if (routes[routeId]) {
+                routes[routeId].visible = !routes[routeId].visible;
+                renderEditModal();
+            }
+        }
+        
+        function updateRouteOrder() {
+            const routeItems = document.querySelectorAll('.route-item');
+            routeItems.forEach((item, index) => {
+                const routeId = item.getAttribute('data-route');
+                if (routes[routeId]) {
+                    routes[routeId].order = index;
+                }
+            });
+        }
+        
         function renderEditModal() {
             const routesList = document.getElementById('routesList');
             routesList.innerHTML = '';
             
-            Object.keys(routes).forEach(routeId => {
+            const sortedRoutes = getSortedRoutes();
+            
+            sortedRoutes.forEach(routeId => {
+                const route = routes[routeId];
                 const routeItem = document.createElement('div');
-                routeItem.className = 'route-item';
+                routeItem.className = `route-item ${!route.visible ? 'hidden-route' : ''}`;
+                routeItem.setAttribute('data-route', routeId);
+                routeItem.draggable = true;
+                
+                const visibilityIcon = route.visible ? '👁️' : '👁️‍🗨️';
+                const visibilityClass = route.visible ? '' : 'hidden';
+                
                 routeItem.innerHTML = `
-                    <input type="text" class="route-name" value="${routes[routeId].name}" data-route="${routeId}" />
-                    <button class="delete-route-btn" data-route="${routeId}">🗑️</button>
+                    <div class="drag-handle">⋮⋮</div>
+                    <input type="text" class="route-name" value="${route.name}" data-route="${routeId}" />
+                    <div class="route-controls">
+                        <button class="control-btn visibility-btn ${visibilityClass}" data-route="${routeId}" title="${route.visible ? 'Ocultar trayecto' : 'Mostrar trayecto'}">${visibilityIcon}</button>
+                        <button class="control-btn delete-btn" data-route="${routeId}" title="Eliminar trayecto">🗑️</button>
+                    </div>
                 `;
                 routesList.appendChild(routeItem);
+                
+                // Event listeners para drag and drop
+                routeItem.addEventListener('dragstart', handleDragStart);
+                routeItem.addEventListener('dragover', handleDragOver);
+                routeItem.addEventListener('drop', handleDrop);
+                routeItem.addEventListener('dragend', handleDragEnd);
             });
             
-            // Event listeners para eliminar rutas
-            document.querySelectorAll('.delete-route-btn').forEach(btn => {
+            // Event listeners para controles
+            document.querySelectorAll('.visibility-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const routeId = this.getAttribute('data-route');
+                    toggleRouteVisibility(routeId);
+                });
+            });
+            
+            document.querySelectorAll('.delete-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const routeId = this.getAttribute('data-route');
                     if (confirm('¿Estás seguro de que quieres eliminar este trayecto?')) {
@@ -445,6 +593,48 @@
                     }
                 });
             });
+        }
+        
+        // Funciones de drag and drop
+        function handleDragStart(e) {
+            draggedElement = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.outerHTML);
+        }
+        
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            this.classList.add('drag-over');
+        }
+        
+        function handleDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            if (draggedElement !== this) {
+                const routesList = document.getElementById('routesList');
+                const draggedIndex = Array.from(routesList.children).indexOf(draggedElement);
+                const targetIndex = Array.from(routesList.children).indexOf(this);
+                
+                if (draggedIndex < targetIndex) {
+                    routesList.insertBefore(draggedElement, this.nextSibling);
+                } else {
+                    routesList.insertBefore(draggedElement, this);
+                }
+                
+                updateRouteOrder();
+            }
+            
+            this.classList.remove('drag-over');
+        }
+        
+        function handleDragEnd(e) {
+            document.querySelectorAll('.route-item').forEach(item => {
+                item.classList.remove('dragging', 'drag-over');
+            });
+            draggedElement = null;
         }
         
         function updateDateTime() {
@@ -537,12 +727,16 @@
             }
             
             const routeId = 'route_' + Date.now();
+            const maxOrder = Math.max(...Object.values(routes).map(r => r.order || 0), -1);
+            
             routes[routeId] = {
                 name: name,
                 originValue: routeData.originValue,
                 originText: routeData.originText,
                 destinationValue: routeData.destinationValue,
-                destinationText: routeData.destinationText
+                destinationText: routeData.destinationText,
+                visible: true,
+                order: maxOrder + 1
             };
             
             document.getElementById('newRouteName').value = '';
